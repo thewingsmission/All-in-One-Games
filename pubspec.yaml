@@ -1,0 +1,113 @@
+name: all_in_one_games
+description: "All-in-One Games - Play & Win: A collection of mini games."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  
+  # UI & Icons
+  cupertino_icons: ^1.0.8
+  
+  # Data handling
+  csv: ^6.0.0
+  
+  # Storage & State Management
+  shared_preferences: ^2.2.2
+  provider: ^6.1.1
+  
+  # Firebase (for Number Link leaderboard)
+  firebase_core: ^4.3.0
+  cloud_firestore: ^6.1.1
+  
+  # HTTP
+  http: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^6.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  uses-material-design: true
+  
+  assets:
+    # Common assets
+    - assets/common/images/
+    - assets/common/icons/
+    - assets/common/fonts/
+
+    # Game menu icons (XXX Icon.png per game)
+    - assets/games/number link/images/Number Link Icon.png
+    - assets/games/wordle/images/Wordle Icon.png
+    - assets/games/nerdle/images/Nerdle Icon.png
+    - assets/games/pokerdle/images/Pokerdle Icon.png
+    - assets/games/sudoku/images/Sudoku Icon.png
+    - assets/games/downstairs/images/Downstairs Icon.png
+    - assets/games/jenga/images/Jenga Icon.png
+    - assets/games/pong/images/Pong Icon.png
+    
+    # Number Link assets
+    - assets/games/number link/images/animals/
+    - assets/games/number link/images/animal skin/
+    - assets/games/number link/images/cat skin/
+    - assets/games/number link/images/dog skin/
+    - assets/games/number link/images/ghost skin/
+    - assets/games/number link/images/monster skin/
+    - assets/games/number link/images/glow skin/
+    - assets/games/number link/images/button/
+    - assets/games/number link/images/congratulation/
+    - assets/games/number link/images/congratulations/
+    - assets/games/number link/images/ui/
+    - assets/games/number link/data/levels/
+    
+    # Wordle assets
+    - assets/games/wordle/images/
+    - assets/games/wordle/data/word_tables/
+    
+    # Nerdle assets
+    - assets/games/nerdle/images/
+    - assets/games/nerdle/data/
+    
+    # Pokerdle assets
+    - assets/games/pokerdle/images/cards/
+    - assets/games/pokerdle/data/
+    
+    # Sudoku assets
+    - assets/games/sudoku/images/
+    - assets/games/sudoku/data/puzzles/
+    
+    # Downstairs assets
+    - assets/games/downstairs/images/
+    - assets/games/downstairs/images/characters/
+    - assets/games/downstairs/images/ui/
+    - assets/games/downstairs/data/
+    
+    # Jenga assets
+    - assets/games/jenga/
+    - assets/games/jenga/images/
+    - assets/games/jenga/data/
+
+    # Pong assets
+    - assets/games/pong/images/
+    - assets/games/pong/data/
+
+    # Sudoku assets
+    - assets/games/sudoku/
