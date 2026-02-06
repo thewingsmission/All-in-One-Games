@@ -167,6 +167,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.monetization_on, color: themeColor, size: 20),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Tokens can be used to purchase game items in each game\'s shop.',
+                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: Colors.white24),
                 ...TokenService.tokenPacks.map((pack) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),

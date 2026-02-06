@@ -1117,7 +1117,7 @@ class _GameScreenState extends State<GameScreen> {
                               Icon(Icons.monetization_on, color: themeColor, size: 18),
                               const SizedBox(width: 4),
                               Text(
-                                '${TokenService.getTokenCount()} ${TokenService.getTokenCount() == 1 ? "Token" : "Tokens"}',
+                                '${TokenService.getTokenCount()}',
                                 style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                             ],
@@ -1150,48 +1150,96 @@ class _GameScreenState extends State<GameScreen> {
                       ],
                     ),
                   ),
-                  _shopRowNL(dialogContext, themeColor, setDialogState, t('hint_x1'), t('reveal_one_path'), 2, TokenService.canAfford(2), () async {
+                  const Divider(color: Colors.white24),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lightbulb_outline, color: themeColor, size: 20),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${t('hint')}: ${t('reveal_one_path_per_hint')}',
+                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _shopRowNL(dialogContext, themeColor, setDialogState, t('hint_x1'), 2, TokenService.canAfford(2), () async {
                     final ok = await TokenService.spendTokens(2);
                     if (ok && mounted) {
                       setState(() => _hintCount++);
                       setDialogState(() {});
                     }
                   }),
-                  _shopRowNL(dialogContext, themeColor, setDialogState, t('hint_x5'), t('reveal_one_path_per_hint'), 6, TokenService.canAfford(6), () async {
+                  _shopRowNL(dialogContext, themeColor, setDialogState, t('hint_x5'), 6, TokenService.canAfford(6), () async {
                     final ok = await TokenService.spendTokens(6);
                     if (ok && mounted) {
                       setState(() => _hintCount += 5);
                       setDialogState(() {});
                     }
                   }),
-                  _shopRowNL(dialogContext, themeColor, setDialogState, t('hint_x25'), t('reveal_one_path_per_hint'), 18, TokenService.canAfford(18), () async {
+                  _shopRowNL(dialogContext, themeColor, setDialogState, t('hint_x25'), 18, TokenService.canAfford(18), () async {
                     final ok = await TokenService.spendTokens(18);
                     if (ok && mounted) {
                       setState(() => _hintCount += 25);
                       setDialogState(() {});
                     }
                   }),
-                  _shopRowNL(dialogContext, themeColor, setDialogState, t('shuffle_x1'), t('load_new_puzzle'), 1, TokenService.canAfford(1), () async {
+                  const Divider(color: Colors.white24),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.shuffle, color: themeColor, size: 20),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${t('shuffle')}: Load a new random puzzle. Each use consumes 1 shuffle.',
+                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _shopRowNL(dialogContext, themeColor, setDialogState, t('shuffle_x1'), 1, TokenService.canAfford(1), () async {
                     final ok = await TokenService.spendTokens(1);
                     if (ok && mounted) {
                       setState(() => _puzzleShuffleCount++);
                       setDialogState(() {});
                     }
                   }),
-                  _shopRowNL(dialogContext, themeColor, setDialogState, t('shuffle_x5'), t('load_new_puzzle_each'), 3, TokenService.canAfford(3), () async {
+                  _shopRowNL(dialogContext, themeColor, setDialogState, t('shuffle_x5'), 3, TokenService.canAfford(3), () async {
                     final ok = await TokenService.spendTokens(3);
                     if (ok && mounted) {
                       setState(() => _puzzleShuffleCount += 5);
                       setDialogState(() {});
                     }
                   }),
-                  _shopRowNL(dialogContext, themeColor, setDialogState, t('shuffle_x25'), t('load_new_puzzle_each'), 9, TokenService.canAfford(9), () async {
+                  _shopRowNL(dialogContext, themeColor, setDialogState, t('shuffle_x25'), 9, TokenService.canAfford(9), () async {
                     final ok = await TokenService.spendTokens(9);
                     if (ok && mounted) {
                       setState(() => _puzzleShuffleCount += 25);
                       setDialogState(() {});
                     }
                   }),
+                  const Divider(color: Colors.white24),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.monetization_on, color: themeColor, size: 20),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Token: Tokens can be used to purchase hint items and shuffle items.',
+                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   ...TokenService.tokenPacks.map((pack) => _shopRowNLTokenPack(
                     dialogContext,
                     themeColor,
@@ -1225,7 +1273,6 @@ class _GameScreenState extends State<GameScreen> {
     Color themeColor,
     void Function(void Function()) setDialogState,
     String name,
-    String desc,
     int price,
     bool enabled,
     VoidCallback onBuy,
@@ -1235,15 +1282,7 @@ class _GameScreenState extends State<GameScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                if (desc.isNotEmpty)
-                  Text(desc, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-              ],
-            ),
+            child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
           ),
           TextButton(
             onPressed: enabled ? () => onBuy() : null,
@@ -1278,15 +1317,13 @@ class _GameScreenState extends State<GameScreen> {
               children: [
                 Icon(Icons.monetization_on, color: themeColor, size: 20),
                 const SizedBox(width: 6),
-                Text('x ${pack.tokens}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(width: 8),
-                Text('\$${pack.usd.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                Text('${pack.tokens}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
               ],
             ),
           ),
           TextButton(
             onPressed: () => onBuy(),
-            child: Text('Buy', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
+            child: Text('\$${pack.usd.toStringAsFixed(0)}', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
           ),
         ],
       ),
@@ -1306,11 +1343,39 @@ class _GameScreenState extends State<GameScreen> {
             style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogTitleFontSize),
           ),
         ),
-        content: const SingleChildScrollView(
-          child: Text(
-            'Connect all pairs of numbers with paths. Paths cannot cross each other or overlap. '
-            'Draw from one number to the other of the same value. Fill every cell to complete the level.',
-            style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Connect all pairs of numbers with paths. Paths cannot cross each other or overlap. '
+                'Draw from one number to the other of the same value. Fill every cell to complete the level.',
+                style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Hint',
+                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Use 1 hint to reveal one path on the board. Quantity: each use consumes 1 hint. '
+                'You can buy Hint x 1 (2 tokens), Hint x 5 (6 tokens), or Hint x 25 (18 tokens) in the Shop.',
+                style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Shuffle',
+                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Use 1 shuffle to load a new random puzzle. Quantity: each use consumes 1 shuffle. '
+                'You can buy Shuffle x 1 (1 token), Shuffle x 5 (3 tokens), or Shuffle x 25 (9 tokens) in the Shop.',
+                style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+              ),
+            ],
           ),
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('OK', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)))],
