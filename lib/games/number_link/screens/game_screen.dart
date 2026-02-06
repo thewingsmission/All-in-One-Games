@@ -349,8 +349,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _showShuffleConfirm(Color themeColor) {
-    if (_puzzleShuffleCount <= 0) return;
     setState(() => _isDialogOpen = true);
+    const int shuffleRequired = 1;
+    final canUseShuffle = _puzzleShuffleCount >= shuffleRequired;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -358,24 +359,51 @@ class _GameScreenState extends State<GameScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: themeColor, width: 2)),
         title: Center(
           child: Text(
-            'Puzzle Shuffle',
+            'Shuffle x $_puzzleShuffleCount',
             style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogTitleFontSize),
           ),
         ),
-        content: const Text(
-          'Load a new random puzzle of the same difficulty. Your current progress on this puzzle will be lost. Continue?',
-          style: TextStyle(color: Colors.white, fontSize: 14),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Items Owned: $_puzzleShuffleCount', style: const TextStyle(color: Colors.white, fontSize: 14)),
+            const SizedBox(height: 8),
+            Text('Items Required: $shuffleRequired', style: const TextStyle(color: Colors.white, fontSize: 14)),
+            const SizedBox(height: 8),
+            const Text(
+              'Effect: Load a new random puzzle of the same difficulty. Your current progress on this puzzle will be lost.',
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
+            if (!canUseShuffle) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'You need more shuffles. Buy tokens in the Shop first, then purchase shuffle items.',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ],
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('No', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize))),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _onPuzzleShuffle();
-            },
-            child: Text('Yes', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
-          ),
-        ],
+        actions: canUseShuffle
+            ? [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('No', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _onPuzzleShuffle();
+                  },
+                  child: Text('Use', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
+                ),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Close', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
+                ),
+              ],
       ),
     ).then((_) { if (mounted) setState(() => _isDialogOpen = false); });
   }
@@ -620,56 +648,10 @@ class _GameScreenState extends State<GameScreen> {
   bool _isHintMode = false;
 
   void _toggleHintMode() {
-    final gameState = context.read<GameState>();
-    
     final themeColor = _topHintColor;
-    // Only block when no hints left
-    if (_hintCount <= 0) {
-      setState(() => _isDialogOpen = true);
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: const Color(0xFF000000),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: themeColor, width: 2),
-          ),
-          title: Center(
-            child: Text(
-              'No Hints Left',
-              style: TextStyle(
-                color: themeColor,
-                fontWeight: FontWeight.bold,
-                fontSize: _dialogTitleFontSize,
-              ),
-            ),
-          ),
-          content: const Text(
-            'You have no hints left. Get more from the Shop.',
-            style: TextStyle(
-              color: Colors.white,
-              letterSpacing: 0.5,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'OK',
-                style: TextStyle(
-                  color: themeColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: _dialogButtonFontSize,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ).then((_) { if (mounted) setState(() => _isDialogOpen = false); });
-      return;
-    }
-    
-    // Show hint confirmation dialog (same style as other popups)
+    // Show hint item dialog (Jenga-style: Items Owned, Items Required, Effect)
+    const int hintRequired = 1;
+    final canUseHint = _hintCount >= hintRequired;
     setState(() => _isDialogOpen = true);
     showDialog(
       context: context,
@@ -681,7 +663,7 @@ class _GameScreenState extends State<GameScreen> {
         ),
         title: Center(
           child: Text(
-            'Use Hint?',
+            'Hint x $_hintCount',
             style: TextStyle(
               color: themeColor,
               fontWeight: FontWeight.bold,
@@ -689,43 +671,50 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ),
         ),
-        content: const Text(
-          'Tap on any endpoint to reveal its complete path. Do you want to use one hint?',
-          style: TextStyle(
-            color: Colors.white,
-            letterSpacing: 0.5,
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Items Owned: $_hintCount', style: const TextStyle(color: Colors.white, fontSize: 14)),
+            const SizedBox(height: 8),
+            Text('Items Required: $hintRequired', style: const TextStyle(color: Colors.white, fontSize: 14)),
+            const SizedBox(height: 8),
+            const Text(
+              'Effect: Tap on any endpoint to reveal its complete path.',
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
+            if (!canUseHint) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'You need more hints. Buy tokens in the Shop first, then purchase hint items.',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ],
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'No',
-              style: TextStyle(
-                color: themeColor,
-                fontWeight: FontWeight.bold,
-                fontSize: _dialogButtonFontSize,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (mounted) setState(() {
-                _isHintMode = true;
-                debugPrint('=== HINT MODE ENABLED ===');
-              });
-            },
-            child: Text(
-              'Yes',
-              style: TextStyle(
-                color: themeColor,
-                fontWeight: FontWeight.bold,
-                fontSize: _dialogButtonFontSize,
-              ),
-            ),
-          ),
-        ],
+        actions: canUseHint
+            ? [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('No', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (mounted) setState(() {
+                      _isHintMode = true;
+                      debugPrint('=== HINT MODE ENABLED ===');
+                    });
+                  },
+                  child: Text('Use', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
+                ),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Close', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize)),
+                ),
+              ],
       ),
     ).then((_) { if (mounted) setState(() => _isDialogOpen = false); });
   }
@@ -901,7 +890,7 @@ class _GameScreenState extends State<GameScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
-              "Don't change",
+              'Close',
               style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize),
             ),
           ),
@@ -1883,13 +1872,18 @@ class _GameScreenState extends State<GameScreen> {
   Widget _buildStylePreview(CellStyle style) {
      switch (style) {
       case CellStyle.numbered:
-        return const Center(
+        return Center(
           child: Text(
             '1',
             style: TextStyle(
               color: Colors.black,
-              fontSize: 24, // 40 * 0.6
+              fontSize: 24,
               fontWeight: FontWeight.bold,
+              shadows: const [
+                Shadow(color: Color(0xE6FFFFFF), blurRadius: 6, offset: Offset.zero),
+                Shadow(color: Color(0xB3FFFFFF), blurRadius: 10, offset: Offset.zero),
+                Shadow(color: Color(0x80FFFFFF), blurRadius: 14, offset: Offset.zero),
+              ],
             ),
           ),
         );
@@ -2601,9 +2595,9 @@ class _GameScreenState extends State<GameScreen> {
                   children: [
                     Expanded(child: _gameDependentPanelButton(context, Icons.palette, 'Skin', (_isButtonsEnabled && !_isDialogOpen) ? () => _showStyleDialog(_topSkinColor) : null, themeColor: _topSkinColor)),
                     const SizedBox(width: 6),
-                    Expanded(child: _gameDependentPanelButton(context, Icons.lightbulb_outline, _hintCount > 0 ? 'Hint x $_hintCount' : 'Hint', (_isButtonsEnabled && !_isDialogOpen && _hintCount > 0) ? () => _toggleHintMode() : null, themeColor: _topHintColor)),
+                    Expanded(child: _gameDependentPanelButton(context, Icons.lightbulb_outline, _hintCount > 0 ? 'Hint x $_hintCount' : 'Hint', (_isButtonsEnabled && !_isDialogOpen) ? () => _toggleHintMode() : null, themeColor: _topHintColor)),
                     const SizedBox(width: 6),
-                    Expanded(child: _gameDependentPanelButton(context, Icons.shuffle, _puzzleShuffleCount > 0 ? 'Shuffle x $_puzzleShuffleCount' : 'Shuffle', (_isButtonsEnabled && !_isDialogOpen && _puzzleShuffleCount > 0) ? () => _showShuffleConfirm(_topShuffleColor) : null, themeColor: _topShuffleColor)),
+                    Expanded(child: _gameDependentPanelButton(context, Icons.shuffle, _puzzleShuffleCount > 0 ? 'Shuffle x $_puzzleShuffleCount' : 'Shuffle', (_isButtonsEnabled && !_isDialogOpen) ? () => _showShuffleConfirm(_topShuffleColor) : null, themeColor: _topShuffleColor)),
                   ],
                 ),
               ),
