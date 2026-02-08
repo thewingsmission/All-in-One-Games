@@ -2,10 +2,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class GlowCellRenderer {
-  /// Helper to get color index from character (a=1, b=2, etc.)
+  /// Helper to get color index from character (a=1, b=2, etc.).
+  /// For asset paths we only have index01..index20 and color_block01..20, so cycle to 1..20.
   static int getColorIndex(String cellValue) {
     if (cellValue.isEmpty || cellValue == '-') return 0;
-    return cellValue.codeUnitAt(0) - 'a'.codeUnitAt(0) + 1;
+    final raw = cellValue.codeUnitAt(0) - 'a'.codeUnitAt(0) + 1;
+    return ((raw - 1) % 20) + 1; // 1..20 so assets always exist
   }
 
   /// Helper to apply color tint to white images
@@ -81,8 +83,10 @@ class GlowCellRenderer {
     return {'imageName': imageName, 'rotation': rotation};
   }
 
-  /// Renders a glow skin terminal cell (endpoint)
-  /// Terminal cell: color_block + index on top, optionally L5a+L5b underneath if one neighbor
+  /// Renders a glow skin terminal cell (endpoint).
+  /// Glow skin color usage: same as path cells — primaryColor (bright) and paleColor (soft).
+  /// Terminal: color_block tinted with primaryColor, index with paleColor; L segments use primary (b) + pale (a).
+  /// Terminal cell: color_block + index on top, optionally L5a+L5b underneath if one neighbor.
   static Widget buildTerminalCell(
     double cellSize,
     String cellValue,
@@ -108,7 +112,7 @@ class GlowCellRenderer {
     // Count neighbors
     final neighborCount = [hasTop, hasRight, hasBottom, hasLeft].where((x) => x).length;
 
-    // Build layers from bottom to top
+    // Build layers from bottom to top (L segments, then color_block, then index from glow skin folder)
     final layers = <Widget>[];
 
     // Determine which L image to use based on neighbor count
@@ -195,26 +199,13 @@ class GlowCellRenderer {
     }
     // 0 neighbors: No L image layer
 
-    // Add color_block
+    // Terminal cell uses same color system as path cells: primary (bright) + pale (soft).
+    // color_block tinted with primaryColor, index tinted with paleColor.
     layers.add(
-      Image.asset(
-        colorBlockPath,
-        width: cellSize,
-        height: cellSize,
-        fit: BoxFit.contain,
-        errorBuilder: (c, e, s) => Container(color: Colors.grey),
-      ),
+      coloredImage(colorBlockPath, primaryColor, cellSize, cellSize),
     );
-
-    // Add index on top
     layers.add(
-      Image.asset(
-        indexPath,
-      width: cellSize,
-      height: cellSize,
-      fit: BoxFit.contain,
-        errorBuilder: (c, e, s) => Container(),
-      ),
+      coloredImage(indexPath, paleColor, cellSize, cellSize),
     );
 
     return SizedBox(
@@ -250,15 +241,13 @@ class GlowCellRenderer {
     final rotation = config['rotation'] as double;
     
     return SizedBox(
-        width: cellSize,
-        height: cellSize,
+      width: cellSize,
+      height: cellSize,
       child: Transform.rotate(
         angle: rotation * math.pi / 180,
         child: Stack(
           children: [
-            // Layer b (primary color) at bottom
             coloredImage('assets/games/number link/images/glow skin/${imageName}b.png', primaryColor, cellSize, cellSize),
-            // Layer a (pale color) on top
             coloredImage('assets/games/number link/images/glow skin/${imageName}a.png', paleColor, cellSize, cellSize),
           ],
         ),

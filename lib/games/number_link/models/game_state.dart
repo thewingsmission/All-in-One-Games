@@ -5,11 +5,6 @@ import '../../../core/constants/gameplay_palette.dart';
 import 'level.dart';
 import 'point.dart';
 import 'cell_style.dart';
-import '../services/animal_skin_service.dart';
-import '../services/cat_skin_service.dart';
-import '../services/dog_skin_service.dart';
-import '../services/ghost_skin_service.dart';
-import '../services/monster_skin_service.dart';
 import '../services/glow_skin_service.dart';
 
 class GameState extends ChangeNotifier {
@@ -25,10 +20,9 @@ class GameState extends ChangeNotifier {
   CellStyle _cellStyle = CellStyle.numbered;
   int _currentLevelNumber = 1; // Track current level in endless mode
   bool _hintUsedThisLevel = false; // Track if hint was used in current level
-  Set<CellStyle> _unlockedSkins = {
-    CellStyle.numbered, 
-    CellStyle.square,
-  }; // Initially only numbered and square are unlocked
+  // TEMPORARY: for testing - all skins unlocked; revert to { numbered, square } when done
+  Set<CellStyle> _unlockedSkins = CellStyle.values.toSet();
+  // Set<CellStyle> _unlockedSkins = { CellStyle.numbered, CellStyle.square };
   bool _isPuzzleFrozen = false; // Track if puzzle is solved and frozen
 
   Level? get currentLevel => _currentLevel;
@@ -87,11 +81,6 @@ class GameState extends ChangeNotifier {
     }
     // Sort logic is inside _generateColorMapping too, but we need it here for consistent randomization call
     uniqueChars.sort();
-    AnimalSkinService.randomizeMapping(uniqueChars);
-    CatSkinService.randomizeMapping(uniqueChars);
-    DogSkinService.randomizeMapping(uniqueChars);
-    GhostSkinService.randomizeMapping(uniqueChars);
-    MonsterSkinService.randomizeMapping(uniqueChars);
     GlowSkinService.randomizeMapping(uniqueChars);
 
     _generateColorMapping(level);
@@ -128,59 +117,12 @@ class GameState extends ChangeNotifier {
   
   /// Check if there are any newly unlocked skins for the current level.
   /// Returns null if no new skins, otherwise returns the newly unlocked skin.
+  /// TEMPORARY: disabled for testing - no level-based unlock.
   CellStyle? checkForNewlyUnlockedSkin() {
-    final level = _currentLevelNumber;
-    
-    // Level 11: Unlock Strip skin
-    if (level == 11 && !_unlockedSkins.contains(CellStyle.strip)) {
-      _unlockedSkins.add(CellStyle.strip);
-      notifyListeners();
-      return CellStyle.strip;
-    }
-    
-    // Level 31: Unlock Glow skin
-    if (level == 31 && !_unlockedSkins.contains(CellStyle.glow)) {
-      _unlockedSkins.add(CellStyle.glow);
-      notifyListeners();
-      return CellStyle.glow;
-    }
-    
-    // Level 51: Unlock Animal skin
-    if (level == 51 && !_unlockedSkins.contains(CellStyle.animal)) {
-      _unlockedSkins.add(CellStyle.animal);
-      notifyListeners();
-      return CellStyle.animal;
-    }
-    
-    // Level 71: Unlock Cat skin
-    if (level == 71 && !_unlockedSkins.contains(CellStyle.cat)) {
-      _unlockedSkins.add(CellStyle.cat);
-      notifyListeners();
-      return CellStyle.cat;
-    }
-    
-    // Level 91: Unlock Dog skin
-    if (level == 91 && !_unlockedSkins.contains(CellStyle.dog)) {
-      _unlockedSkins.add(CellStyle.dog);
-      notifyListeners();
-      return CellStyle.dog;
-    }
-    
-    // Level 111: Unlock Ghost skin
-    if (level == 111 && !_unlockedSkins.contains(CellStyle.ghost)) {
-      _unlockedSkins.add(CellStyle.ghost);
-      notifyListeners();
-      return CellStyle.ghost;
-    }
-    
-    // Level 131: Unlock Monster skin
-    if (level == 131 && !_unlockedSkins.contains(CellStyle.monster)) {
-      _unlockedSkins.add(CellStyle.monster);
-      notifyListeners();
-      return CellStyle.monster;
-    }
-    
-    return null;
+    return null; // TEMPORARY: skip level-based skin unlock for tests
+    // final level = _currentLevelNumber;
+    // if (level == 11 && !_unlockedSkins.contains(CellStyle.strip)) { ... }
+    // ... (restore when done testing)
   }
   
   /// Unlock all skins that should be available for the current level
@@ -194,22 +136,6 @@ class GameState extends ChangeNotifier {
     if (level >= 31) {
       _unlockedSkins.add(CellStyle.glow);
     }
-    if (level >= 51) {
-      _unlockedSkins.add(CellStyle.animal);
-    }
-    if (level >= 71) {
-      _unlockedSkins.add(CellStyle.cat);
-    }
-    if (level >= 91) {
-      _unlockedSkins.add(CellStyle.dog);
-    }
-    if (level >= 111) {
-      _unlockedSkins.add(CellStyle.ghost);
-    }
-    if (level >= 131) {
-      _unlockedSkins.add(CellStyle.monster);
-    }
-    
     notifyListeners();
   }
   
@@ -225,14 +151,17 @@ class GameState extends ChangeNotifier {
   }
 
   void _generateColorMapping(Level level) {
-    // Gameplay palette: 20 colors (10 main + 10 pale), same as design guide
+    // Gameplay palette: 20 colors (max 20 lines). All skins use primary from these 20.
+    // Glow skin: primary = one of 20 colors; secondary (inner path / digit) = paler or darker
+    // depending on primary index, and must differ from the palette counterpart.
     final colors = GameplayPalette.colors;
-    final paleColors = GameplayPalette.paleForGlow;
+    final mainColors = GameplayPalette.mainColors;
+    final paleColors = GameplayPalette.paleColors;
 
     _colorMapping.clear();
     _paleColorMapping.clear();
-    _colorMapping['-'] = Colors.white; // White for empty cells
-    _paleColorMapping['-'] = Colors.white; // White for empty cells
+    _colorMapping['-'] = Colors.white;
+    _paleColorMapping['-'] = Colors.white;
 
     final uniqueChars = <String>[];
     int totalTerminalCells = 0;
@@ -253,7 +182,7 @@ class GameState extends ChangeNotifier {
 
     uniqueChars.sort();
 
-    // Each level: randomly select from the 20 palette colors (shuffle indices)
+    // Randomly assign 20 palette colors to lines (indices 0–19)
     final indices = List.generate(colors.length, (i) => i)..shuffle(Random());
 
     debugPrint('=== LEVEL DEBUG ===');
@@ -275,7 +204,13 @@ class GameState extends ChangeNotifier {
     for (var i = 0; i < uniqueChars.length; i++) {
       final idx = indices[i % indices.length];
       _colorMapping[uniqueChars[i]] = colors[idx];
-      _paleColorMapping[uniqueChars[i]] = paleColors[idx];
+
+      // Glow skin: index 0–9 → secondary = pale counterpart; index 10–19 → secondary = dark counterpart.
+      if (idx < 10) {
+        _paleColorMapping[uniqueChars[i]] = paleColors[idx];
+      } else {
+        _paleColorMapping[uniqueChars[i]] = mainColors[idx - 10];
+      }
     }
   }
 
@@ -461,6 +396,8 @@ class GameState extends ChangeNotifier {
       // Load unlocked skins
       final skinStrings = await storageService.getUnlockedSkins();
       _unlockedSkins = skinStrings.map((s) => _stringToSkin(s)).toSet().cast<CellStyle>();
+      // TEMPORARY: for testing - force all skins unlocked; remove next line when done
+      _unlockedSkins = CellStyle.values.toSet();
       debugPrint('Loaded skins: $skinStrings');
       
       // Load current skin
@@ -504,16 +441,6 @@ class GameState extends ChangeNotifier {
         return CellStyle.square;
       case 'strip':
         return CellStyle.strip;
-      case 'animal':
-        return CellStyle.animal;
-      case 'cat':
-        return CellStyle.cat;
-      case 'dog':
-        return CellStyle.dog;
-      case 'ghost':
-        return CellStyle.ghost;
-      case 'monster':
-        return CellStyle.monster;
       case 'glow':
         return CellStyle.glow;
       default:
@@ -529,16 +456,6 @@ class GameState extends ChangeNotifier {
         return 'square';
       case CellStyle.strip:
         return 'strip';
-      case CellStyle.animal:
-        return 'animal';
-      case CellStyle.cat:
-        return 'cat';
-      case CellStyle.dog:
-        return 'dog';
-      case CellStyle.ghost:
-        return 'ghost';
-      case CellStyle.monster:
-        return 'monster';
       case CellStyle.glow:
         return 'glow';
     }

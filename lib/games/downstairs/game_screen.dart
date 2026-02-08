@@ -394,6 +394,8 @@ class _DownstairsGameScreenState extends State<DownstairsGameScreen> with Ticker
     );
   }
   
+  static const Color _downstairsGameOverColor = Color(0xFF00D9FF); // Matches menu button
+
   Widget _buildGameOverScreen() {
     return Center(
       child: Container(
@@ -403,10 +405,10 @@ class _DownstairsGameScreenState extends State<DownstairsGameScreen> with Ticker
         decoration: BoxDecoration(
           color: AppTheme.backgroundColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.primaryMagenta, width: 2),
+          border: Border.all(color: _downstairsGameOverColor, width: 2),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryMagenta.withOpacity(0.3),
+              color: _downstairsGameOverColor.withOpacity(0.3),
               blurRadius: 20,
               spreadRadius: 4,
             ),
@@ -415,12 +417,12 @@ class _DownstairsGameScreenState extends State<DownstairsGameScreen> with Ticker
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.sentiment_dissatisfied, color: AppTheme.primaryMagenta, size: 56),
+            Icon(Icons.sentiment_dissatisfied, color: _downstairsGameOverColor, size: 56),
             const SizedBox(height: 12),
             Text(
               'GAME OVER',
               style: TextStyle(
-                color: AppTheme.primaryMagenta,
+                color: _downstairsGameOverColor,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.5,
@@ -459,7 +461,7 @@ class _DownstairsGameScreenState extends State<DownstairsGameScreen> with Ticker
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.primaryMagenta,
+          backgroundColor: _downstairsGameOverColor,
           foregroundColor: Colors.black,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

@@ -12,7 +12,6 @@ import 'package:all_in_one_games/core/services/token_service.dart';
 import 'package:all_in_one_games/core/l10n/app_localizations.dart';
 import 'package:all_in_one_games/games/number_link/services/storage_service.dart';
 import 'package:all_in_one_games/games/number_link/widgets/game_board_unity_style.dart';
-import 'package:all_in_one_games/games/number_link/services/animal_skin_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -185,6 +184,12 @@ class _GameScreenState extends State<GameScreen> {
   int _skinCount = 3;
   int _hintCount = 3;
   int _puzzleShuffleCount = 3;
+  /// Within same level: 1st hint use = 1, 2nd = 2, 3rd = 4 (power of 2). Reset when level changes.
+  int _hintUseCount = 0;
+  /// Within same game: 1st shuffle use = 1, 2nd = 2, 3rd = 4 (power of 2). Reset on Restart.
+  int _shuffleUseCount = 0;
+  /// Cost for current hint use (set when user taps Use in hint dialog).
+  int _pendingHintCost = 0;
 
   final GlobalKey _gameBoardKey = GlobalKey();
   Uint8List? _solvedPuzzleScreenshot;
@@ -339,19 +344,21 @@ class _GameScreenState extends State<GameScreen> {
 
   void _loadInitialLevel() {
     final gameState = context.read<GameState>();
-    // In endless mode, use algorithm to get difficulty
     final difficulty = _levelService.getDifficultyForLevel(gameState.currentLevelNumber);
     final level = _levelService.getRandomLevel(difficulty);
     if (level != null) {
       gameState.setDifficulty(difficulty);
       gameState.loadLevel(level);
+      setState(() {
+        _hintUseCount = 0;
+      });
     }
   }
 
   void _showShuffleConfirm(Color themeColor) {
     setState(() => _isDialogOpen = true);
-    const int shuffleRequired = 1;
-    final canUseShuffle = _puzzleShuffleCount >= shuffleRequired;
+    final shuffleCost = 1 << _shuffleUseCount;
+    final canUseShuffle = _puzzleShuffleCount >= shuffleCost;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -359,7 +366,7 @@ class _GameScreenState extends State<GameScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: themeColor, width: 2)),
         title: Center(
           child: Text(
-            'Shuffle x $_puzzleShuffleCount',
+            'Shuffle',
             style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogTitleFontSize),
           ),
         ),
@@ -367,19 +374,62 @@ class _GameScreenState extends State<GameScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Items Owned: $_puzzleShuffleCount', style: const TextStyle(color: Colors.white, fontSize: 14)),
+            Text.rich(TextSpan(
+              children: [
+                TextSpan(text: 'Items Owned: ', style: TextStyle(color: themeColor, fontSize: 14)),
+                TextSpan(text: '$_puzzleShuffleCount', style: const TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            )),
             const SizedBox(height: 8),
-            Text('Items Required: $shuffleRequired', style: const TextStyle(color: Colors.white, fontSize: 14)),
-            const SizedBox(height: 8),
-            const Text(
-              'Effect: Load a new random puzzle of the same difficulty. Your current progress on this puzzle will be lost.',
-              style: TextStyle(color: Colors.white, fontSize: 14),
+            Text.rich(TextSpan(
+              children: [
+                TextSpan(text: 'Items Required: ', style: TextStyle(color: themeColor, fontSize: 14)),
+                TextSpan(text: '$shuffleCost', style: const TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            )),
+            const SizedBox(height: 14),
+            Text.rich(TextSpan(
+              children: [
+                TextSpan(text: 'Effect: ', style: TextStyle(color: themeColor, fontSize: 14)),
+                const TextSpan(text: 'Load a new random puzzle of the same difficulty. Your current progress on this puzzle will be lost.', style: TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            )),
+            const SizedBox(height: 14),
+            Text('Price model:', style: TextStyle(color: themeColor, fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Table(
+              defaultColumnWidth: const IntrinsicColumnWidth(),
+              border: TableBorder.all(color: Colors.white24, width: 1),
+              children: [
+                TableRow(
+                  children: [
+                    _tableCell('Use', true),
+                    _tableCell('1st', true),
+                    _tableCell('2nd', true),
+                    _tableCell('3rd', true),
+                    _tableCell('4th', true),
+                    _tableCell('…', true),
+                  ],
+                ),
+                TableRow(
+                  children: [
+                    _tableCell('Cost (shuffles)', true),
+                    _tableCell('1', false),
+                    _tableCell('2', false),
+                    _tableCell('4', false),
+                    _tableCell('8', false),
+                    _tableCell('doubles', false),
+                  ],
+                ),
+              ],
             ),
+            const SizedBox(height: 4),
+            const Text('Resets when you restart the game.', style: TextStyle(color: Colors.white70, fontSize: 12)),
             if (!canUseShuffle) ...[
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'You need more shuffles. Buy tokens in the Shop first, then purchase shuffle items.',
-                style: TextStyle(color: Colors.white, fontSize: 13),
+                style: TextStyle(color: themeColor, fontSize: 13),
               ),
             ],
           ],
@@ -410,12 +460,16 @@ class _GameScreenState extends State<GameScreen> {
 
   void _onPuzzleShuffle() {
     final gameState = context.read<GameState>();
-    if (_puzzleShuffleCount <= 0) return;
-    // Load a random puzzle from the same difficulty (very_easy, easy, normal, hard, very_hard)
+    final cost = 1 << _shuffleUseCount;
+    if (_puzzleShuffleCount < cost) return;
     final difficulty = gameState.difficulty;
     final level = _levelService.getRandomLevel(difficulty);
     if (level != null) {
-      setState(() => _puzzleShuffleCount--);
+      setState(() {
+        _puzzleShuffleCount -= cost;
+        _shuffleUseCount++;
+        _hintUseCount = 0;
+      });
       gameState.loadLevel(level);
     }
   }
@@ -424,9 +478,10 @@ class _GameScreenState extends State<GameScreen> {
     final gameState = context.read<GameState>();
     gameState.advanceToNextLevel();
     
-    // Clear previous screenshot
+    // Clear previous screenshot; reset hint use count for new level
     setState(() {
       _solvedPuzzleScreenshot = null;
+      _hintUseCount = 0;
     });
     
     // Save progress after advancing level
@@ -604,7 +659,7 @@ class _GameScreenState extends State<GameScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: unlockedSkin == CellStyle.animal ? Colors.transparent : Colors.orange,
+                color: Colors.orange,
                 borderRadius: BorderRadius.circular(4),
                 boxShadow: [
                   BoxShadow(
@@ -649,9 +704,8 @@ class _GameScreenState extends State<GameScreen> {
 
   void _toggleHintMode() {
     final themeColor = _topHintColor;
-    // Show hint item dialog (Jenga-style: Items Owned, Items Required, Effect)
-    const int hintRequired = 1;
-    final canUseHint = _hintCount >= hintRequired;
+    final hintCost = 1 << _hintUseCount;
+    final canUseHint = _hintCount >= hintCost;
     setState(() => _isDialogOpen = true);
     showDialog(
       context: context,
@@ -663,7 +717,7 @@ class _GameScreenState extends State<GameScreen> {
         ),
         title: Center(
           child: Text(
-            'Hint x $_hintCount',
+            'Hint',
             style: TextStyle(
               color: themeColor,
               fontWeight: FontWeight.bold,
@@ -675,19 +729,62 @@ class _GameScreenState extends State<GameScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Items Owned: $_hintCount', style: const TextStyle(color: Colors.white, fontSize: 14)),
+            Text.rich(TextSpan(
+              children: [
+                TextSpan(text: 'Items Owned: ', style: TextStyle(color: themeColor, fontSize: 14)),
+                TextSpan(text: '$_hintCount', style: const TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            )),
             const SizedBox(height: 8),
-            Text('Items Required: $hintRequired', style: const TextStyle(color: Colors.white, fontSize: 14)),
-            const SizedBox(height: 8),
-            const Text(
-              'Effect: Tap on any endpoint to reveal its complete path.',
-              style: TextStyle(color: Colors.white, fontSize: 14),
+            Text.rich(TextSpan(
+              children: [
+                TextSpan(text: 'Items Required: ', style: TextStyle(color: themeColor, fontSize: 14)),
+                TextSpan(text: '$hintCost', style: const TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            )),
+            const SizedBox(height: 14),
+            Text.rich(TextSpan(
+              children: [
+                TextSpan(text: 'Effect: ', style: TextStyle(color: themeColor, fontSize: 14)),
+                const TextSpan(text: 'Tap on any endpoint to reveal its complete path.', style: TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            )),
+            const SizedBox(height: 14),
+            Text('Price model:', style: TextStyle(color: themeColor, fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Table(
+              defaultColumnWidth: const IntrinsicColumnWidth(),
+              border: TableBorder.all(color: Colors.white24, width: 1),
+              children: [
+                TableRow(
+                  children: [
+                    _tableCell('Use', true),
+                    _tableCell('1st', true),
+                    _tableCell('2nd', true),
+                    _tableCell('3rd', true),
+                    _tableCell('4th', true),
+                    _tableCell('…', true),
+                  ],
+                ),
+                TableRow(
+                  children: [
+                    _tableCell('Cost (hints)', true),
+                    _tableCell('1', false),
+                    _tableCell('2', false),
+                    _tableCell('4', false),
+                    _tableCell('8', false),
+                    _tableCell('doubles', false),
+                  ],
+                ),
+              ],
             ),
+            const SizedBox(height: 4),
+            const Text('Resets when you advance to the next level.', style: TextStyle(color: Colors.white70, fontSize: 12)),
             if (!canUseHint) ...[
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'You need more hints. Buy tokens in the Shop first, then purchase hint items.',
-                style: TextStyle(color: Colors.white, fontSize: 13),
+                style: TextStyle(color: themeColor, fontSize: 13),
               ),
             ],
           ],
@@ -702,6 +799,7 @@ class _GameScreenState extends State<GameScreen> {
                   onPressed: () {
                     Navigator.pop(context);
                     if (mounted) setState(() {
+                      _pendingHintCost = hintCost;
                       _isHintMode = true;
                       debugPrint('=== HINT MODE ENABLED ===');
                     });
@@ -722,7 +820,9 @@ class _GameScreenState extends State<GameScreen> {
   void _handleHintSelection(String color) {
     setState(() {
       _isHintMode = false;
-      _hintCount--; // Decrement only when hint is actually used on the puzzle
+      _hintCount -= _pendingHintCost;
+      _hintUseCount++;
+      _pendingHintCost = 0;
     });
     context.read<GameState>().applyHint(color);
     _checkWin();
@@ -770,21 +870,6 @@ class _GameScreenState extends State<GameScreen> {
                   case CellStyle.glow:
                     unlockText = 'Unlock at level 31';
                     break;
-                  case CellStyle.animal:
-                    unlockText = 'Unlock at level 51';
-                    break;
-                  case CellStyle.cat:
-                    unlockText = 'Unlock at level 71';
-                    break;
-                  case CellStyle.dog:
-                    unlockText = 'Unlock at level 91';
-                    break;
-                  case CellStyle.ghost:
-                    unlockText = 'Unlock at level 111';
-                    break;
-                  case CellStyle.monster:
-                    unlockText = 'Unlock at level 131';
-                    break;
                   default:
                     unlockText = '';
                 }
@@ -804,13 +889,7 @@ class _GameScreenState extends State<GameScreen> {
                             height: 40,
                             margin: const EdgeInsets.only(right: 12),
                             decoration: BoxDecoration(
-                              color: (style == CellStyle.animal || 
-                                      style == CellStyle.cat || 
-                                      style == CellStyle.dog || 
-                                      style == CellStyle.ghost || 
-                                      style == CellStyle.monster) 
-                                  ? Colors.transparent 
-                                  : Colors.orange,
+                              color: Colors.orange,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: isUnlocked
@@ -1054,6 +1133,7 @@ class _GameScreenState extends State<GameScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: Text('No', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: _dialogButtonFontSize))),
           TextButton(onPressed: () async {
             Navigator.pop(context);
+            setState(() => _shuffleUseCount = 0);
             gameState.resetLevelNumber();
             await gameState.saveProgress(_storageService);
             _loadInitialLevel();
@@ -1147,9 +1227,14 @@ class _GameScreenState extends State<GameScreen> {
                         Icon(Icons.lightbulb_outline, color: themeColor, size: 20),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: Text(
-                            '${t('hint')}: ${t('reveal_one_path_per_hint')}',
-                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                          child: RichText(
+                            text: TextSpan(
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              children: [
+                                TextSpan(text: '${t('hint')}: ', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold)),
+                                const TextSpan(text: 'Reveal one random path', style: TextStyle(color: Colors.white)),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1184,9 +1269,14 @@ class _GameScreenState extends State<GameScreen> {
                         Icon(Icons.shuffle, color: themeColor, size: 20),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: Text(
-                            '${t('shuffle')}: Load a new random puzzle. Each use consumes 1 shuffle.',
-                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                          child: RichText(
+                            text: TextSpan(
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              children: [
+                                TextSpan(text: '${t('shuffle')}: ', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold)),
+                                const TextSpan(text: 'Load a new random puzzle', style: TextStyle(color: Colors.white)),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1221,9 +1311,14 @@ class _GameScreenState extends State<GameScreen> {
                         Icon(Icons.monetization_on, color: themeColor, size: 20),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: Text(
-                            'Token: Tokens can be used to purchase hint items and shuffle items.',
-                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                          child: RichText(
+                            text: TextSpan(
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              children: [
+                                TextSpan(text: 'Token: ', style: TextStyle(color: themeColor, fontWeight: FontWeight.bold)),
+                                const TextSpan(text: 'Tokens can be used to purchase hint items and shuffle items', style: TextStyle(color: Colors.white)),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1255,6 +1350,20 @@ class _GameScreenState extends State<GameScreen> {
         },
       ),
     ).then((_) { if (mounted) setState(() => _isDialogOpen = false); });
+  }
+
+  static Widget _tableCell(String text, bool isHeader) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: isHeader ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    );
   }
 
   Widget _shopRowNL(
@@ -1337,31 +1446,45 @@ class _GameScreenState extends State<GameScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                'How to Play',
+                style: TextStyle(color: themeColor, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
               const Text(
                 'Connect all pairs of numbers with paths. Paths cannot cross each other or overlap. '
                 'Draw from one number to the other of the same value. Fill every cell to complete the level.',
                 style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Hint',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                style: TextStyle(color: themeColor, fontSize: 15, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               const Text(
-                'Use 1 hint to reveal one path on the board. Quantity: each use consumes 1 hint. '
-                'You can buy Hint x 1 (2 tokens), Hint x 5 (6 tokens), or Hint x 25 (18 tokens) in the Shop.',
+                'Reveals one random path on the board. You can buy hint packs in the Shop.',
                 style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
               ),
-              const SizedBox(height: 12),
-              const Text(
+              const SizedBox(height: 16),
+              Text(
                 'Shuffle',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                style: TextStyle(color: themeColor, fontSize: 15, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               const Text(
-                'Use 1 shuffle to load a new random puzzle. Quantity: each use consumes 1 shuffle. '
-                'You can buy Shuffle x 1 (1 token), Shuffle x 5 (3 tokens), or Shuffle x 25 (9 tokens) in the Shop.',
+                'Loads a new random puzzle of the same difficulty. You can buy shuffle packs in the Shop.',
+                style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Cost',
+                style: TextStyle(color: themeColor, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Each use of Hint or Shuffle consumes a number of items: the first use costs 1, '
+                'the second use costs 2, the third costs 4, and so on (doubling). Hint use count resets when you complete a level; shuffle use count resets when you restart the game.',
                 style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
               ),
             ],
@@ -1954,181 +2077,6 @@ class _GameScreenState extends State<GameScreen> {
             ],
           ),
         );
-      case CellStyle.animal:
-        return Stack(
-          children: [
-            // Orange background cell
-            Container(
-              width: 40,
-              height: 40,
-              color: Colors.orange,
-            ),
-            // Blurred layer for glow (respects transparency)
-            ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-              child: ColorFiltered(
-                colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcATop),
-                child: Image.asset(
-                  'assets/games/number link/images/animal skin/animal_image_01.png',
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            // Original sharp image
-            Image.asset(
-              'assets/games/number link/images/animal skin/animal_image_01.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => Container(
-                color: Colors.grey,
-                child: const Icon(Icons.pets, color: Colors.white, size: 20),
-              ),
-            ),
-          ],
-        );
-      case CellStyle.cat:
-        return Stack(
-          children: [
-            // Orange background cell
-            Container(
-              width: 40,
-              height: 40,
-              color: Colors.orange,
-            ),
-            // Blurred layer for glow (respects transparency)
-            ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-              child: ColorFiltered(
-                colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcATop),
-                child: Image.asset(
-                  'assets/games/number link/images/cat skin/cat_image_01.png',
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            // Original sharp image
-            Image.asset(
-              'assets/games/number link/images/cat skin/cat_image_01.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => Container(
-                color: Colors.pink.shade100,
-                child: const Icon(Icons.pets, color: Colors.white, size: 20),
-              ),
-            ),
-          ],
-        );
-      case CellStyle.dog:
-        return Stack(
-          children: [
-            // Orange background cell
-            Container(
-              width: 40,
-              height: 40,
-              color: Colors.orange,
-            ),
-            // Blurred layer for glow (respects transparency)
-            ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-              child: ColorFiltered(
-                colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcATop),
-                child: Image.asset(
-                  'assets/games/number link/images/dog skin/dog_image_01.png',
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            // Original sharp image
-            Image.asset(
-              'assets/games/number link/images/dog skin/dog_image_01.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => Container(
-                color: Colors.brown.shade100,
-                child: const Icon(Icons.pets, color: Colors.white, size: 20),
-              ),
-            ),
-          ],
-        );
-      case CellStyle.ghost:
-        return Stack(
-          children: [
-            // Orange background cell
-            Container(
-              width: 40,
-              height: 40,
-              color: Colors.orange,
-            ),
-            // Blurred layer for glow (respects transparency)
-            ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-              child: ColorFiltered(
-                colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcATop),
-                child: Image.asset(
-                  'assets/games/number link/images/ghost skin/ghost_image_01.png',
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            // Original sharp image
-            Image.asset(
-              'assets/games/number link/images/ghost skin/ghost_image_01.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => Container(
-                color: Colors.grey.shade200,
-                child: const Icon(Icons.cloud, color: Colors.white, size: 20),
-              ),
-            ),
-          ],
-        );
-      case CellStyle.monster:
-        return Stack(
-          children: [
-            // Orange background cell
-            Container(
-              width: 40,
-              height: 40,
-              color: Colors.orange,
-            ),
-            // Blurred layer for glow (respects transparency)
-            ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-              child: ColorFiltered(
-                colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcATop),
-                child: Image.asset(
-                  'assets/games/number link/images/monster skin/monster_image_01.png',
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            // Original sharp image
-            Image.asset(
-              'assets/games/number link/images/monster skin/monster_image_01.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => Container(
-                color: Colors.purple.shade100,
-                child: const Icon(Icons.bug_report, color: Colors.white, size: 20),
-              ),
-            ),
-          ],
-        );
       case CellStyle.glow:
         // Glow skin preview - show color_block01 with index01 on top
         return Stack(
@@ -2313,12 +2261,7 @@ class _GameScreenState extends State<GameScreen> {
         );
 
       case CellStyle.glow:
-      case CellStyle.animal:
-      case CellStyle.cat:
-      case CellStyle.dog:
-      case CellStyle.ghost:
-      case CellStyle.monster:
-        // For glow and image-based skins, just show colored square with small indicator
+        // For glow skin, just show colored square with small indicator
         return Stack(
           children: [
             container,
@@ -2602,33 +2545,46 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
 
-              // Game board - fits screen without scrolling
+              // Game board - fits screen without scrolling. When in hint mode, tap outside board cancels.
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 8.0, right: 8.0, top: 0, bottom: 8.0),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return Center(
-                        child: RepaintBoundary(
-                          key: _gameBoardKey,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth,
-                              maxHeight: constraints.maxHeight,
-                            ),
-                            child: FittedBox(
-                              fit: BoxFit.contain,
-                              child: GameBoardUnityStyle(
-                                onCellChanged: () => _checkWin(),
-                                isHintMode: _isHintMode,
-                                onHintSelected: _handleHintSelection,
-                                onHintCancelled: () => setState(() => _isHintMode = false),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTapUp: (details) {
+                    if (!_isHintMode) return;
+                    final box = _gameBoardKey.currentContext?.findRenderObject() as RenderBox?;
+                    if (box == null) {
+                      setState(() => _isHintMode = false);
+                      return;
+                    }
+                    final local = box.globalToLocal(details.globalPosition);
+                    if (!box.size.contains(local)) setState(() => _isHintMode = false);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8.0, right: 8.0, top: 0, bottom: 8.0),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Center(
+                          child: RepaintBoundary(
+                            key: _gameBoardKey,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: constraints.maxWidth,
+                                maxHeight: constraints.maxHeight,
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.contain,
+                                child: GameBoardUnityStyle(
+                                  onCellChanged: () => _checkWin(),
+                                  isHintMode: _isHintMode,
+                                  onHintSelected: _handleHintSelection,
+                                  onHintCancelled: () => setState(() => _isHintMode = false),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),

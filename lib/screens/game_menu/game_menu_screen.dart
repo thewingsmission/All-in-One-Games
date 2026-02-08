@@ -541,8 +541,8 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Tokens can be used to purchase game items in each game\'s shop.',
-                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                          'Tokens can be used to purchase game items in each game\'s shop',
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
