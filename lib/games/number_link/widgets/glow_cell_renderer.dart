@@ -1,309 +1,420 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+/// Glow skin renderer using L1a-L5a images (512×512) based on neighbor configuration.
+/// - Terminal: transparent background + primary-colored circle + L5a.png (if 1 neighbor)
+/// - Path: transparent background + L1a/L2a/L3a/L4a.png tinted primary (based on neighbors)
+/// - Bridge: transparent background + L1a.png tinted primary, scaled by dimensions
 class GlowCellRenderer {
-  /// Helper to get color index from character (a=1, b=2, etc.).
-  /// For asset paths we only have index01..index20 and color_block01..20, so cycle to 1..20.
-  static int getColorIndex(String cellValue) {
-    if (cellValue.isEmpty || cellValue == '-') return 0;
-    final raw = cellValue.codeUnitAt(0) - 'a'.codeUnitAt(0) + 1;
-    return ((raw - 1) % 20) + 1; // 1..20 so assets always exist
-  }
-
-  /// Helper to apply color tint to white images
-  static Widget coloredImage(String assetPath, Color color, double width, double height, {BoxFit fit = BoxFit.contain}) {
-    return ColorFiltered(
-      colorFilter: ColorFilter.mode(color, BlendMode.srcATop),
-      child: Image.asset(
-        assetPath,
-        width: width,
-        height: height,
-        fit: fit,
-        errorBuilder: (c, e, s) => Container(
-          color: Colors.grey,
-          child: Icon(Icons.error, color: Colors.white, size: width * 0.3),
-        ),
-      ),
-    );
-  }
-
-  /// Helper to determine L image name and rotation based on neighbors
-  static Map<String, dynamic> _getLImageConfig(bool hasTop, bool hasRight, bool hasBottom, bool hasLeft) {
-    final neighborCount = [hasTop, hasRight, hasBottom, hasLeft].where((x) => x).length;
-    String imageName;
-    double rotation = 0;
-
-    if (neighborCount == 1) {
-      // 1 neighbor - use L1 straight line
-      imageName = 'L1';
-      if (hasTop || hasBottom) {
-        rotation = 90; // Vertical
-      } else {
-        rotation = 0; // Horizontal
-      }
-    } else if (neighborCount == 2) {
-      // 2 neighbors
-      if (hasTop && hasBottom) {
-        imageName = 'L1';
-        rotation = 90;
-      } else if (hasLeft && hasRight) {
-        imageName = 'L1';
-        rotation = 0;
-      } else if (hasTop && hasRight) {
-        imageName = 'L2';
-        rotation = 90;
-      } else if (hasRight && hasBottom) {
-        imageName = 'L2';
-        rotation = 180;
-      } else if (hasBottom && hasLeft) {
-        imageName = 'L2';
-        rotation = 270;
-      } else {
-        imageName = 'L2';
-        rotation = 0;
-      }
-    } else if (neighborCount == 3) {
-      // 3 neighbors (T-junction)
-      imageName = 'L3';
-      if (!hasTop) {
-        rotation = 180;
-      } else if (!hasRight) {
-        rotation = 270;
-      } else if (!hasBottom) {
-        rotation = 0;
-      } else {
-        rotation = 90;
-      }
-    } else {
-      // 4 neighbors (cross) or 0 neighbors
-      imageName = 'L4';
-      rotation = 0;
-    }
-
-    return {'imageName': imageName, 'rotation': rotation};
-  }
-
-  /// Renders a glow skin terminal cell (endpoint).
-  /// Glow skin color usage: same as path cells — primaryColor (bright) and paleColor (soft).
-  /// Terminal: color_block tinted with primaryColor, index with paleColor; L segments use primary (b) + pale (a).
-  /// Terminal cell: color_block + index on top, optionally L5a+L5b underneath if one neighbor.
+  static const String _basePath = 'assets/games/number link/images/glow skin';
+  
+  /// Terminal cell: transparent background + circle of primary color + L image underneath.
+  /// Circle diameter = 0.75 × cellSize.
+  /// L image selection:
+  /// - 0 neighbors: no L image
+  /// - 1 neighbor: L5a.png + L5b.png (terminal-specific)
+  /// - 2+ neighbors: L1a/L2a/L3a/L4a.png + Lxb.png (same as path cells)
   static Widget buildTerminalCell(
     double cellSize,
-    String cellValue,
     Color primaryColor,
-    Color paleColor, {
-    required bool hasTop,
-    required bool hasRight,
-    required bool hasBottom,
-    required bool hasLeft,
+    Color secondaryColor, {
+    bool hasLeft = false,
+    bool hasRight = false,
+    bool hasTop = false,
+    bool hasBottom = false,
   }) {
-    final colorIndex = getColorIndex(cellValue);
-    if (colorIndex == 0) {
-      return Container(
+    final circleSize = cellSize * 0.75;
+    final neighborCount = (hasLeft ? 1 : 0) + (hasRight ? 1 : 0) + (hasTop ? 1 : 0) + (hasBottom ? 1 : 0);
+    
+    // Terminal with 0 neighbors: just circle (no L image)
+    if (neighborCount == 0) {
+      return SizedBox(
         width: cellSize,
         height: cellSize,
-        color: Colors.white,
+        child: Center(
+          child: Container(
+            width: circleSize,
+            height: circleSize,
+            decoration: BoxDecoration(
+              color: primaryColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
       );
     }
-
-    final colorBlockPath = 'assets/games/number link/images/glow skin/color_block${colorIndex.toString().padLeft(2, '0')}.png';
-    final indexPath = 'assets/games/number link/images/glow skin/index${colorIndex.toString().padLeft(2, '0')}.png';
-
-    // Count neighbors
-    final neighborCount = [hasTop, hasRight, hasBottom, hasLeft].where((x) => x).length;
-
-    // Build layers from bottom to top (L segments, then color_block, then index from glow skin folder)
-    final layers = <Widget>[];
-
-    // Determine which L image to use based on neighbor count
+    
+    // Terminal with 1+ neighbors: add L image layer underneath circle
+    String imageFile;
+    double rotation;
+    
     if (neighborCount == 1) {
-      // 1 neighbor: Use L5 only
-      double rotation = 0;
-      if (hasLeft) rotation = 0;
-      if (hasRight) rotation = 180;
-      if (hasTop) rotation = 90;
-      if (hasBottom) rotation = 270;
-
-      layers.add(
-        Transform.rotate(
-          angle: rotation * math.pi / 180,
-          child: Stack(
-            children: [
-              coloredImage('assets/games/number link/images/glow skin/L5b.png', primaryColor, cellSize, cellSize),
-              coloredImage('assets/games/number link/images/glow skin/L5a.png', paleColor, cellSize, cellSize),
-            ],
-          ),
-        ),
-      );
-    } else if (neighborCount == 2) {
-      // 2 neighbors: Use L1 for straight lines, L2 for corners
-      String imageName;
-      double rotation = 0;
-      
-      if (hasLeft && hasRight) {
-        // Horizontal line
-        imageName = 'L1';
-        rotation = 0;
-      } else if (hasTop && hasBottom) {
-        // Vertical line
-        imageName = 'L1';
-        rotation = 90;
-      } else if (hasLeft && hasTop) {
-        // Left-top corner
-        imageName = 'L2';
-        rotation = 0;
-      } else if (hasTop && hasRight) {
-        // Top-right corner
-        imageName = 'L2';
-        rotation = 90;
-      } else if (hasRight && hasBottom) {
-        // Right-bottom corner
-        imageName = 'L2';
-        rotation = 180;
-      } else {
-        // hasBottom && hasLeft - Bottom-left corner
-        imageName = 'L2';
-        rotation = 270;
-      }
-
-      layers.add(
-        Transform.rotate(
-          angle: rotation * math.pi / 180,
-          child: Stack(
-            children: [
-              coloredImage('assets/games/number link/images/glow skin/${imageName}b.png', primaryColor, cellSize, cellSize),
-              coloredImage('assets/games/number link/images/glow skin/${imageName}a.png', paleColor, cellSize, cellSize),
-            ],
-          ),
-        ),
-    );
-    } else if (neighborCount == 3) {
-      // 3 neighbors: Use L3
-      double rotation = 0;
-      if (hasLeft && hasTop && hasRight) rotation = 0;
-      if (hasTop && hasRight && hasBottom) rotation = 90;
-      if (hasRight && hasBottom && hasLeft) rotation = 180;
-      if (hasBottom && hasLeft && hasTop) rotation = 270;
-
-      layers.add(
-        Transform.rotate(
-          angle: rotation * math.pi / 180,
-          child: Stack(
-            children: [
-              coloredImage('assets/games/number link/images/glow skin/L3b.png', primaryColor, cellSize, cellSize),
-              coloredImage('assets/games/number link/images/glow skin/L3a.png', paleColor, cellSize, cellSize),
-            ],
-          ),
-        ),
-      );
-    }
-    // 0 neighbors: No L image layer
-
-    // Terminal cell uses same color system as path cells: primary (bright) + pale (soft).
-    // color_block tinted with primaryColor, index tinted with paleColor.
-    layers.add(
-      coloredImage(colorBlockPath, primaryColor, cellSize, cellSize),
-    );
-    layers.add(
-      coloredImage(indexPath, paleColor, cellSize, cellSize),
-    );
-
-    return SizedBox(
-      width: cellSize,
-      height: cellSize,
-      child: Stack(children: layers),
-    );
-  }
-  
-  /// Renders a glow skin regular cell based on neighbors
-  /// Uses L1a+L1b, L2a+L2b, L3a+L3b, or L4a+L4b based on neighbor configuration
-  static Widget buildRegularCell(
-    double cellSize,
-    String cellValue,
-    Color primaryColor,
-    Color paleColor, {
-    required bool hasTop,
-    required bool hasRight,
-    required bool hasBottom,
-    required bool hasLeft,
-  }) {
-    if (cellValue.isEmpty || cellValue == '-') {
-      return Container(
-        width: cellSize,
-        height: cellSize,
-        color: Colors.white,
-      );
+      // 1 neighbor: use L5a.png (terminal-specific)
+      imageFile = 'L5a.png';
+      rotation = _getTerminalRotation(hasLeft, hasRight, hasTop, hasBottom);
+    } else {
+      // 2+ neighbors: use same logic as path cells (L1a/L2a/L3a/L4a)
+      imageFile = _getLImageFile(neighborCount, hasLeft, hasRight, hasTop, hasBottom);
+      rotation = _getLImageRotation(neighborCount, hasLeft, hasRight, hasTop, hasBottom);
     }
     
-    // Get L1/L2/L3/L4 configuration based on neighbors
-    final config = _getLImageConfig(hasTop, hasRight, hasBottom, hasLeft);
-    final imageName = config['imageName'] as String;
-    final rotation = config['rotation'] as double;
+    // Get the partner Lxb file name (e.g., L1a.png → L1b.png)
+    final imageFileB = imageFile.replaceAll('a.png', 'b.png');
     
     return SizedBox(
       width: cellSize,
       height: cellSize,
-      child: Transform.rotate(
-        angle: rotation * math.pi / 180,
-        child: Stack(
-          children: [
-            coloredImage('assets/games/number link/images/glow skin/${imageName}b.png', primaryColor, cellSize, cellSize),
-            coloredImage('assets/games/number link/images/glow skin/${imageName}a.png', paleColor, cellSize, cellSize),
-          ],
-        ),
+      child: Stack(
+        children: [
+          // Lxb layer (bottom, secondary color)
+          Transform.rotate(
+            angle: rotation * 3.14159265359 / 180, // Convert degrees to radians
+            child: ColorFiltered(
+              colorFilter: ColorFilter.mode(secondaryColor, BlendMode.srcIn),
+              child: Image.asset(
+                '$_basePath/$imageFileB',
+                width: cellSize,
+                height: cellSize,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // ignore: avoid_print
+                  print('ERROR loading $imageFileB for terminal: $error');
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+          // Lxa layer (middle, primary color)
+          Transform.rotate(
+            angle: rotation * 3.14159265359 / 180, // Convert degrees to radians
+            child: ColorFiltered(
+              colorFilter: ColorFilter.mode(primaryColor, BlendMode.srcIn),
+              child: Image.asset(
+                '$_basePath/$imageFile',
+                width: cellSize,
+                height: cellSize,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // ignore: avoid_print
+                  print('ERROR loading $imageFile for terminal: $error');
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+          // Circle on top
+          Center(
+            child: Container(
+              width: circleSize,
+              height: circleSize,
+              decoration: BoxDecoration(
+                color: primaryColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
   
-  /// Renders a glow skin bridge connector (in the gap between cells)
-  /// Bridge uses L1a + L1b with color tinting
-  /// For vertical bridges, L1 images are rotated 90° but container stays in place
+  /// Path cell: transparent background + Lxb.png (secondary color) + Lxa.png (primary color).
+  /// Image selection and rotation based on neighbor configuration.
+  static Widget buildRegularCell(
+    double cellSize,
+    Color primaryColor,
+    Color secondaryColor, {
+    bool hasLeft = false,
+    bool hasRight = false,
+    bool hasTop = false,
+    bool hasBottom = false,
+  }) {
+    final neighborCount = (hasLeft ? 1 : 0) + (hasRight ? 1 : 0) + (hasTop ? 1 : 0) + (hasBottom ? 1 : 0);
+    
+    // Determine which L image to use and rotation
+    final imageFile = _getLImageFile(neighborCount, hasLeft, hasRight, hasTop, hasBottom);
+    final imageFileB = imageFile.replaceAll('a.png', 'b.png');
+    final rotation = _getLImageRotation(neighborCount, hasLeft, hasRight, hasTop, hasBottom);
+    
+    return SizedBox(
+      width: cellSize,
+      height: cellSize,
+      child: Stack(
+        children: [
+          // Lxb layer (bottom, secondary color)
+          Transform.rotate(
+            angle: rotation * 3.14159265359 / 180, // Convert degrees to radians
+            child: ColorFiltered(
+              colorFilter: ColorFilter.mode(secondaryColor, BlendMode.srcIn),
+              child: Image.asset(
+                '$_basePath/$imageFileB',
+                width: cellSize,
+                height: cellSize,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // ignore: avoid_print
+                  print('ERROR loading $imageFileB for path cell: $error');
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+          // Lxa layer (top, primary color)
+          Transform.rotate(
+            angle: rotation * 3.14159265359 / 180, // Convert degrees to radians
+            child: ColorFiltered(
+              colorFilter: ColorFilter.mode(primaryColor, BlendMode.srcIn),
+              child: Image.asset(
+                '$_basePath/$imageFile',
+                width: cellSize,
+                height: cellSize,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // ignore: avoid_print
+                  print('ERROR loading $imageFile for path cell: $error');
+                  // Very obvious error: magenta background + white X
+                  return Container(
+                    color: const Color(0xFFFF00FF), // Magenta
+                    child: Stack(
+                      children: [
+                        // Diagonal lines forming X
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _ErrorXPainter(),
+                          ),
+                        ),
+                        // Text "ERR"
+                        Center(
+                          child: Text(
+                            'ERR',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: cellSize * 0.3,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Determine which L image file to use based on neighbor count and configuration.
+  static String _getLImageFile(int neighborCount, bool hasLeft, bool hasRight, bool hasTop, bool hasBottom) {
+    switch (neighborCount) {
+      case 1:
+        return 'L1a.png'; // Path with 1 neighbor uses L1a
+      case 2:
+        // Straight line (left-right or top-bottom) → L1a.png
+        if ((hasLeft && hasRight) || (hasTop && hasBottom)) {
+          return 'L1a.png';
+        }
+        // Corner → L2a.png
+        return 'L2a.png';
+      case 3:
+        return 'L3a.png'; // T-junction
+      case 4:
+        return 'L4a.png'; // Cross
+      default:
+        return 'L1a.png'; // Fallback
+    }
+  }
+  
+  /// Determine rotation angle based on neighbor configuration.
+  static double _getLImageRotation(int neighborCount, bool hasLeft, bool hasRight, bool hasTop, bool hasBottom) {
+    switch (neighborCount) {
+      case 1:
+        // One neighbor: rotate so stripe points toward neighbor
+        if (hasLeft) return 0.0;
+        if (hasRight) return 180.0;
+        if (hasTop) return 90.0;
+        if (hasBottom) return 270.0;
+        return 0.0;
+      
+      case 2:
+        // Straight line
+        if ((hasLeft && hasRight)) return 0.0; // Horizontal
+        if ((hasTop && hasBottom)) return 90.0; // Vertical
+        
+        // Corner (L2a.png)
+        if (hasTop && hasRight) return 90.0;
+        if (hasRight && hasBottom) return 180.0;
+        if (hasBottom && hasLeft) return 270.0;
+        if (hasTop && hasLeft) return 0.0;
+        return 0.0;
+      
+      case 3:
+        // T-junction: rotation based on missing side
+        if (!hasTop) return 180.0;    // Missing top
+        if (!hasRight) return 270.0;  // Missing right
+        if (!hasBottom) return 0.0;   // Missing bottom
+        if (!hasLeft) return 90.0;    // Missing left
+        return 0.0;
+      
+      case 4:
+        return 0.0; // Cross: always 0°
+      
+      default:
+        return 0.0;
+    }
+  }
+  
+  /// Get rotation for terminal cell with 1 neighbor (L5a.png).
+  static double _getTerminalRotation(bool hasLeft, bool hasRight, bool hasTop, bool hasBottom) {
+    if (hasLeft) return 0.0;
+    if (hasRight) return 180.0;
+    if (hasTop) return 90.0;
+    if (hasBottom) return 270.0;
+    return 0.0;
+  }
+  
+  /// Bridge: transparent background + L1b.png (secondary) + L1a.png (primary).
+  /// Horizontal bridge (e.g. 10×256): scale x by (10/512), y by (256/512) → BoxFit.fill
+  /// Vertical bridge: rotate 90° clockwise then scale.
   static Widget buildBridge(
     double bridgeWidth,
     double bridgeHeight,
-    String cellValue,
     Color primaryColor,
-    Color paleColor,
+    Color secondaryColor,
     bool isHorizontal,
   ) {
-    if (cellValue.isEmpty || cellValue == '-') {
-      return Container(
+    if (isHorizontal) {
+      // Horizontal bridge: L1b (secondary) + L1a (primary), no rotation
+      return SizedBox(
         width: bridgeWidth,
         height: bridgeHeight,
-        color: Colors.white,
+        child: Stack(
+          children: [
+            // L1b layer (bottom, secondary color)
+            ColorFiltered(
+              colorFilter: ColorFilter.mode(secondaryColor, BlendMode.srcIn),
+              child: Image.asset(
+                '$_basePath/L1b.png',
+                width: bridgeWidth,
+                height: bridgeHeight,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // ignore: avoid_print
+                  print('ERROR loading L1b.png for horizontal bridge: $error');
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+            // L1a layer (top, primary color)
+            ColorFiltered(
+              colorFilter: ColorFilter.mode(primaryColor, BlendMode.srcIn),
+              child: Image.asset(
+                '$_basePath/L1a.png',
+                width: bridgeWidth,
+                height: bridgeHeight,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // ignore: avoid_print
+                  print('ERROR loading L1a.png for horizontal bridge: $error');
+                  // Very obvious error: magenta with white text
+                  return Container(
+                    color: const Color(0xFFFF00FF), // Magenta
+                    child: Center(
+                      child: FittedBox(
+                        child: Text(
+                          'ERR',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       );
     }
     
-    if (isHorizontal) {
-      // Horizontal bridge: L1 images without rotation
-      return SizedBox(
-        width: bridgeWidth,
-        height: bridgeHeight,
+    // Vertical bridge: L1b (secondary) + L1a (primary), rotate 90° clockwise
+    return SizedBox(
+      width: bridgeWidth,
+      height: bridgeHeight,
+      child: RotatedBox(
+        quarterTurns: 1,
         child: Stack(
           children: [
-            coloredImage('assets/games/number link/images/glow skin/L1b.png', primaryColor, bridgeWidth, bridgeHeight, fit: BoxFit.fill),
-            coloredImage('assets/games/number link/images/glow skin/L1a.png', paleColor, bridgeWidth, bridgeHeight, fit: BoxFit.fill),
+            // L1b layer (bottom, secondary color)
+            ColorFiltered(
+              colorFilter: ColorFilter.mode(secondaryColor, BlendMode.srcIn),
+              child: Image.asset(
+                '$_basePath/L1b.png',
+                width: bridgeHeight,
+                height: bridgeWidth,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // ignore: avoid_print
+                  print('ERROR loading L1b.png for vertical bridge: $error');
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+            // L1a layer (top, primary color)
+            ColorFiltered(
+              colorFilter: ColorFilter.mode(primaryColor, BlendMode.srcIn),
+              child: Image.asset(
+                '$_basePath/L1a.png',
+                width: bridgeHeight,
+                height: bridgeWidth,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // ignore: avoid_print
+                  print('ERROR loading L1a.png for vertical bridge: $error');
+                  // Very obvious error: magenta with white text
+                  return Container(
+                    color: const Color(0xFFFF00FF), // Magenta
+                    child: Center(
+                      child: FittedBox(
+                        child: Text(
+                          'ERR',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
-      );
-    } else {
-      // Vertical bridge: Use RotatedBox to pre-rotate L1 images by 90°
-      return SizedBox(
-        width: bridgeWidth,
-        height: bridgeHeight,
-        child: Stack(
-          children: [
-            RotatedBox(
-              quarterTurns: 1, // 90° clockwise
-              child: coloredImage('assets/games/number link/images/glow skin/L1b.png', primaryColor, bridgeHeight, bridgeWidth, fit: BoxFit.fill),
-            ),
-            RotatedBox(
-              quarterTurns: 1, // 90° clockwise
-              child: coloredImage('assets/games/number link/images/glow skin/L1a.png', paleColor, bridgeHeight, bridgeWidth, fit: BoxFit.fill),
-            ),
-          ],
-        ),
-      );
-    }
+      ),
+    );
   }
+}
+
+/// Custom painter to draw a white X for error indication
+class _ErrorXPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+    
+    // Draw X (two diagonal lines)
+    canvas.drawLine(Offset(0, 0), Offset(size.width, size.height), paint);
+    canvas.drawLine(Offset(size.width, 0), Offset(0, size.height), paint);
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

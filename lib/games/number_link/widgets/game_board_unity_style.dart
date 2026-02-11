@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:all_in_one_games/games/number_link/models/game_state.dart';
 import 'package:all_in_one_games/games/number_link/models/cell_style.dart';
 import 'package:all_in_one_games/games/number_link/widgets/red_bridge_overlay.dart';
-import 'package:all_in_one_games/games/number_link/services/glow_skin_service.dart';
 import 'package:all_in_one_games/games/number_link/widgets/glow_cell_renderer.dart';
 
 class GameBoardUnityStyle extends StatefulWidget {
@@ -350,23 +349,17 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
           ),
         );
       case CellStyle.glow:
-        // Glow skin - terminal cell
+        // Glow skin - terminal cell (circle with primary color + Lxa/Lxb layers)
         final primaryColor = gameState.colorMapping[cellValue] ?? Colors.grey;
-        final paleColor = gameState.paleColorMapping[cellValue] ?? Colors.grey;
-        // Check neighbors for terminal cell
-        final hasTop = row > 0 && gameState.playerGrid[row - 1][col] == cellValue;
-        final hasBottom = row < gameState.playerGrid.length - 1 && gameState.playerGrid[row + 1][col] == cellValue;
-        final hasLeft = col > 0 && gameState.playerGrid[row][col - 1] == cellValue;
-        final hasRight = col < gameState.playerGrid[0].length - 1 && gameState.playerGrid[row][col + 1] == cellValue;
+        final secondaryColor = gameState.secondaryColorMapping[cellValue] ?? Colors.grey;
         return GlowCellRenderer.buildTerminalCell(
           cellSize,
-          cellValue,
           primaryColor,
-          paleColor,
-          hasTop: hasTop,
-          hasRight: hasRight,
-          hasBottom: hasBottom,
+          secondaryColor,
           hasLeft: hasLeft,
+          hasRight: hasRight,
+          hasTop: hasTop,
+          hasBottom: hasBottom,
         );
     }
   }
@@ -536,8 +529,7 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
           ),
         );
       case CellStyle.glow:
-        // Glow skin - for terminal cells, use transparent background
-        // The terminal image will be rendered on top by _buildNodeIndicator
+        // Glow skin - terminal cells get transparent background (circle rendered by _buildNodeIndicator)
         if (isTerminal) {
           return Container(
             width: cellSize,
@@ -545,18 +537,25 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
             color: Colors.transparent,
           );
         }
-        // Regular cell with neighbor detection and colors
+        // Empty cells: white background
+        if (cellValue.isEmpty || cellValue == '-') {
+          return Container(
+            width: cellSize,
+            height: cellSize,
+            color: Colors.white,
+          );
+        }
+        // Path cells: Lxb.png (secondary) + Lxa.png (primary) based on neighbors
         final primaryColor = gameState.colorMapping[cellValue] ?? Colors.grey;
-        final paleColor = gameState.paleColorMapping[cellValue] ?? Colors.grey;
+        final secondaryColor = gameState.secondaryColorMapping[cellValue] ?? Colors.grey;
         return GlowCellRenderer.buildRegularCell(
           cellSize,
-          cellValue,
           primaryColor,
-          paleColor,
-          hasTop: hasTop,
-          hasRight: hasRight,
-          hasBottom: hasBottom,
+          secondaryColor,
           hasLeft: hasLeft,
+          hasRight: hasRight,
+          hasTop: hasTop,
+          hasBottom: hasBottom,
         );
     }
   }
@@ -857,7 +856,7 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
                               ),
                             ),
                           ],
-                          // Bridges for Glow style - Use L1a+L1b images with colors
+                          // Bridges for Glow style - L1b (secondary) + L1a (primary)
                           if (gameState.cellStyle == CellStyle.glow && hasRightNeighbor) ...[
                              Positioned(
                                left: cellSize,
@@ -865,9 +864,8 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
                                child: GlowCellRenderer.buildBridge(
                                  gap,
                                  cellSize,
-                                 cell,
                                  gameState.colorMapping[cell] ?? Colors.grey,
-                                 gameState.paleColorMapping[cell] ?? Colors.grey,
+                                 gameState.secondaryColorMapping[cell] ?? Colors.grey,
                                  true, // isHorizontal
                                ),
                             ),
@@ -879,9 +877,8 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
                                child: GlowCellRenderer.buildBridge(
                                  cellSize,
                                  gap,
-                                 cell,
                                  gameState.colorMapping[cell] ?? Colors.grey,
-                                 gameState.paleColorMapping[cell] ?? Colors.grey,
+                                 gameState.secondaryColorMapping[cell] ?? Colors.grey,
                                  false, // isHorizontal (vertical)
                                ),
                             ),

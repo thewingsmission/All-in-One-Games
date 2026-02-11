@@ -5,13 +5,12 @@ import '../../../core/constants/gameplay_palette.dart';
 import 'level.dart';
 import 'point.dart';
 import 'cell_style.dart';
-import '../services/glow_skin_service.dart';
 
 class GameState extends ChangeNotifier {
   Level? _currentLevel;
   List<List<String>> _playerGrid = [];
   Map<String, Color> _colorMapping = {};
-  Map<String, Color> _paleColorMapping = {}; // Pale colors for glow skin
+  Map<String, Color> _secondaryColorMapping = {}; // Secondary color for glow skin Lxb layer
   String? _currentDrawingColor;
   int _cumulativeScore = 0;
   String _difficulty = 'very_easy';
@@ -28,7 +27,7 @@ class GameState extends ChangeNotifier {
   Level? get currentLevel => _currentLevel;
   List<List<String>> get playerGrid => _playerGrid;
   Map<String, Color> get colorMapping => _colorMapping;
-  Map<String, Color> get paleColorMapping => _paleColorMapping; // Expose pale colors
+  Map<String, Color> get secondaryColorMapping => _secondaryColorMapping;
   String? get currentDrawingColor => _currentDrawingColor;
   int get cumulativeScore => _cumulativeScore;
   String get difficulty => _difficulty;
@@ -67,22 +66,6 @@ class GameState extends ChangeNotifier {
     }
 
     // Generate random colors for each unique character
-    // AND randomize animal skin mapping
-    
-    // First, find all unique chars to pass to skin service
-    final uniqueChars = <String>[];
-    for (int row = 0; row < level.height; row++) {
-      for (int col = 0; col < level.width; col++) {
-        final char = level.questionGrid[row][col];
-        if (char != '-' && !uniqueChars.contains(char)) {
-          uniqueChars.add(char);
-        }
-      }
-    }
-    // Sort logic is inside _generateColorMapping too, but we need it here for consistent randomization call
-    uniqueChars.sort();
-    GlowSkinService.randomizeMapping(uniqueChars);
-
     _generateColorMapping(level);
     _currentDrawingColor = null;
     _lockedCells.clear(); // Clear locked cells for new level
@@ -152,16 +135,11 @@ class GameState extends ChangeNotifier {
 
   void _generateColorMapping(Level level) {
     // Gameplay palette: 20 colors (max 20 lines). All skins use primary from these 20.
-    // Glow skin: primary = one of 20 colors; secondary (inner path / digit) = paler or darker
-    // depending on primary index, and must differ from the palette counterpart.
     final colors = GameplayPalette.colors;
-    final mainColors = GameplayPalette.mainColors;
-    final paleColors = GameplayPalette.paleColors;
-
     _colorMapping.clear();
-    _paleColorMapping.clear();
+    _secondaryColorMapping.clear();
     _colorMapping['-'] = Colors.white;
-    _paleColorMapping['-'] = Colors.white;
+    _secondaryColorMapping['-'] = Colors.white;
 
     final uniqueChars = <String>[];
     int totalTerminalCells = 0;
@@ -204,13 +182,12 @@ class GameState extends ChangeNotifier {
     for (var i = 0; i < uniqueChars.length; i++) {
       final idx = indices[i % indices.length];
       _colorMapping[uniqueChars[i]] = colors[idx];
-
-      // Glow skin: index 0–9 → secondary = pale counterpart; index 10–19 → secondary = dark counterpart.
-      if (idx < 10) {
-        _paleColorMapping[uniqueChars[i]] = paleColors[idx];
-      } else {
-        _paleColorMapping[uniqueChars[i]] = mainColors[idx - 10];
-      }
+      
+      // Calculate secondary color for glow skin Lxb layer
+      // If primary index < 10, secondary = primary + 10
+      // If primary index >= 10, secondary = primary - 10
+      final secondaryIdx = idx < 10 ? idx + 10 : idx - 10;
+      _secondaryColorMapping[uniqueChars[i]] = colors[secondaryIdx];
     }
   }
 

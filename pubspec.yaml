@@ -64,8 +64,9 @@ flutter:
     - assets/games/jenga/images/Jenga Icon.png
     - assets/games/pong/images/Pong Icon.png
     
-    # Number Link assets (add glow skin/, ui/, etc. when those folders exist)
+    # Number Link assets
     - assets/games/number link/images/
+    - assets/games/number link/images/glow skin/
     - assets/games/number link/data/levels/
     
     # Wordle assets

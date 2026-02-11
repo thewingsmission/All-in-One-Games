@@ -2078,27 +2078,16 @@ class _GameScreenState extends State<GameScreen> {
           ),
         );
       case CellStyle.glow:
-        // Glow skin preview - show color_block01 with index01 on top
-        return Stack(
-          children: [
-            Image.asset(
-              'assets/games/number link/images/glow skin/color_block01.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.contain,
-              errorBuilder: (c, e, s) => Container(
-                color: Colors.grey,
-                child: const Icon(Icons.lightbulb, color: Colors.white, size: 24),
-              ),
+        // Glow skin preview - simple orange circle
+        return Center(
+          child: Container(
+            width: 24, // 40 * 0.6 for visible circle size
+            height: 24,
+            decoration: const BoxDecoration(
+              color: Colors.orange,
+              shape: BoxShape.circle,
             ),
-            Image.asset(
-              'assets/games/number link/images/glow skin/index01.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.contain,
-              errorBuilder: (c, e, s) => Container(),
-            ),
-          ],
+          ),
         );
     } 
   }
@@ -2261,16 +2250,21 @@ class _GameScreenState extends State<GameScreen> {
         );
 
       case CellStyle.glow:
-        // For glow skin, just show colored square with small indicator
+        // Glow skin: colored circle (diameter = 0.75 × size, matching actual renderer)
         return Stack(
           children: [
-            container,
+            // Transparent background for terminal
+            Container(
+              width: size,
+              height: size,
+              color: Colors.transparent,
+            ),
             Center(
               child: Container(
-                width: size * 0.3,
-                height: size * 0.3,
+                width: size * 0.6,
+                height: size * 0.6,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
+                  color: color,
                   shape: BoxShape.circle,
                 ),
               ),
