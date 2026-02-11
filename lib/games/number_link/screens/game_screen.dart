@@ -2078,15 +2078,57 @@ class _GameScreenState extends State<GameScreen> {
           ),
         );
       case CellStyle.glow:
-        // Glow skin preview - simple orange circle
-        return Center(
-          child: Container(
-            width: 24, // 40 * 0.6 for visible circle size
-            height: 24,
-            decoration: const BoxDecoration(
-              color: Colors.orange,
-              shape: BoxShape.circle,
-            ),
+        const squareSize = 24.0;
+        const cornerRadius = squareSize * 0.2;
+        return SizedBox(
+          width: 40,
+          height: 40,
+          child: Stack(
+            children: [
+              Transform.rotate(
+                angle: 0,
+                child: ColorFiltered(
+                  colorFilter: const ColorFilter.mode(Color(0xFFFF8C00), BlendMode.srcIn),
+                  child: Image.asset(
+                    'assets/games/number link/images/glow skin/L5b.png',
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.fill,
+                    errorBuilder: (c, e, s) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+              Transform.rotate(
+                angle: 0,
+                child: ColorFiltered(
+                  colorFilter: const ColorFilter.mode(Colors.orange, BlendMode.srcIn),
+                  child: Image.asset(
+                    'assets/games/number link/images/glow skin/L5a.png',
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.fill,
+                    errorBuilder: (c, e, s) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+              Center(
+                child: Container(
+                  width: squareSize,
+                  height: squareSize,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(cornerRadius),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white,
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
     } 
@@ -2250,10 +2292,8 @@ class _GameScreenState extends State<GameScreen> {
         );
 
       case CellStyle.glow:
-        // Glow skin: colored circle (diameter = 0.75 × size, matching actual renderer)
         return Stack(
           children: [
-            // Transparent background for terminal
             Container(
               width: size,
               height: size,
@@ -2265,7 +2305,7 @@ class _GameScreenState extends State<GameScreen> {
                 height: size * 0.6,
                 decoration: BoxDecoration(
                   color: color,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(size * 0.12),
                 ),
               ),
             ),

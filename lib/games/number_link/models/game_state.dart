@@ -10,7 +10,7 @@ class GameState extends ChangeNotifier {
   Level? _currentLevel;
   List<List<String>> _playerGrid = [];
   Map<String, Color> _colorMapping = {};
-  Map<String, Color> _secondaryColorMapping = {}; // Secondary color for glow skin Lxb layer
+  Map<String, Color> _secondaryColorMapping = {};
   String? _currentDrawingColor;
   int _cumulativeScore = 0;
   String _difficulty = 'very_easy';
@@ -134,7 +134,6 @@ class GameState extends ChangeNotifier {
   }
 
   void _generateColorMapping(Level level) {
-    // Gameplay palette: 20 colors (max 20 lines). All skins use primary from these 20.
     final colors = GameplayPalette.colors;
     _colorMapping.clear();
     _secondaryColorMapping.clear();
@@ -182,10 +181,6 @@ class GameState extends ChangeNotifier {
     for (var i = 0; i < uniqueChars.length; i++) {
       final idx = indices[i % indices.length];
       _colorMapping[uniqueChars[i]] = colors[idx];
-      
-      // Calculate secondary color for glow skin Lxb layer
-      // If primary index < 10, secondary = primary + 10
-      // If primary index >= 10, secondary = primary - 10
       final secondaryIdx = idx < 10 ? idx + 10 : idx - 10;
       _secondaryColorMapping[uniqueChars[i]] = colors[secondaryIdx];
     }

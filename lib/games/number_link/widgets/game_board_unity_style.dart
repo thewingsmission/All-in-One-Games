@@ -349,7 +349,6 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
           ),
         );
       case CellStyle.glow:
-        // Glow skin - terminal cell (circle with primary color + Lxa/Lxb layers)
         final primaryColor = gameState.colorMapping[cellValue] ?? Colors.grey;
         final secondaryColor = gameState.secondaryColorMapping[cellValue] ?? Colors.grey;
         return GlowCellRenderer.buildTerminalCell(
@@ -529,7 +528,6 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
           ),
         );
       case CellStyle.glow:
-        // Glow skin - terminal cells get transparent background (circle rendered by _buildNodeIndicator)
         if (isTerminal) {
           return Container(
             width: cellSize,
@@ -537,7 +535,6 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
             color: Colors.transparent,
           );
         }
-        // Empty cells: white background
         if (cellValue.isEmpty || cellValue == '-') {
           return Container(
             width: cellSize,
@@ -545,7 +542,6 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
             color: Colors.white,
           );
         }
-        // Path cells: Lxb.png (secondary) + Lxa.png (primary) based on neighbors
         final primaryColor = gameState.colorMapping[cellValue] ?? Colors.grey;
         final secondaryColor = gameState.secondaryColorMapping[cellValue] ?? Colors.grey;
         return GlowCellRenderer.buildRegularCell(
@@ -856,7 +852,6 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
                               ),
                             ),
                           ],
-                          // Bridges for Glow style - L1b (secondary) + L1a (primary)
                           if (gameState.cellStyle == CellStyle.glow && hasRightNeighbor) ...[
                              Positioned(
                                left: cellSize,
