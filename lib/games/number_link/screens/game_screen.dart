@@ -14,6 +14,8 @@ import 'package:all_in_one_games/games/number_link/services/storage_service.dart
 import 'package:all_in_one_games/games/number_link/widgets/game_board_unity_style.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:all_in_one_games/core/services/admob_service.dart';
 
 // Leaderboard Entry Model
 class LeaderboardEntry {
@@ -179,6 +181,9 @@ class _GameScreenState extends State<GameScreen> {
   late final LeaderboardService _leaderboardService;
   bool _servicesInitialized = false;
   bool _isDialogOpen = false;
+  
+  BannerAd? _bannerAd;
+  bool _isBannerAdLoaded = false;
 
   // Game-dependent item quantities (default 3 each)
   int _skinCount = 3;
@@ -202,6 +207,32 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     _initializeServices();
+    _loadBannerAd();
+  }
+  
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+  
+  void _loadBannerAd() {
+    _bannerAd = BannerAd(
+      adUnitId: AdMobService.bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          setState(() {
+            _isBannerAdLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          print('Banner ad failed to load: $error');
+          ad.dispose();
+        },
+      ),
+    )..load();
   }
 
   Future<void> _initializeServices() async {
@@ -2622,6 +2653,16 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 ),
               ),
+              
+              // AdMob Banner Ad
+              if (_isBannerAdLoaded && _bannerAd != null)
+                Container(
+                  alignment: Alignment.center,
+                  width: _bannerAd!.size.width.toDouble(),
+                  height: _bannerAd!.size.height.toDouble(),
+                  child: AdWidget(ad: _bannerAd!),
+                ),
+              
               // Standard buttons at bottom: 5 same-size buttons with icons. SafeArea + margin for device gesture area.
               SafeArea(
                 top: false,
