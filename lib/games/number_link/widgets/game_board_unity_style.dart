@@ -355,6 +355,7 @@ class _GameBoardUnityStyleState extends State<GameBoardUnityStyle> {
           cellSize,
           primaryColor,
           secondaryColor,
+          cellValue,
           hasLeft: hasLeft,
           hasRight: hasRight,
           hasTop: hasTop,

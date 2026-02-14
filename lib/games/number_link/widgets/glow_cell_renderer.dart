@@ -2,39 +2,87 @@ import 'package:flutter/material.dart';
 
 class GlowCellRenderer {
   static const String _basePath = 'assets/games/number link/images/glow skin';
+  static const String _terminalPath = 'assets/games/number link/images/glow skin';
+  
   static Widget buildTerminalCell(
     double cellSize,
     Color primaryColor,
-    Color secondaryColor, {
+    Color secondaryColor,
+    String cellValue, {
     bool hasLeft = false,
     bool hasRight = false,
     bool hasTop = false,
     bool hasBottom = false,
   }) {
     final squareSize = cellSize * 0.75;
-    final cornerRadius = squareSize * 0.2;
     final neighborCount = (hasLeft ? 1 : 0) + (hasRight ? 1 : 0) + (hasTop ? 1 : 0) + (hasBottom ? 1 : 0);
+    
+    final indexNumber = _getIndexNumber(cellValue);
+    final indexFile = 'index${indexNumber.toString().padLeft(2, '0')}.png';
     
     if (neighborCount == 0) {
       return SizedBox(
         width: cellSize,
         height: cellSize,
-        child: Center(
-          child: Container(
-            width: squareSize,
-            height: squareSize,
-            decoration: BoxDecoration(
-              color: primaryColor,
-              borderRadius: BorderRadius.circular(cornerRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: secondaryColor,
-                  blurRadius: 8,
-                  spreadRadius: 2,
+        child: Stack(
+          children: [
+            Center(
+              child: SizedBox(
+                width: squareSize,
+                height: squareSize,
+                child: Stack(
+                  children: [
+                    ColorFiltered(
+                      colorFilter: ColorFilter.mode(secondaryColor, BlendMode.srcIn),
+                      child: Image.asset(
+                        '$_terminalPath/terminal_cell_glow.png',
+                        width: squareSize,
+                        height: squareSize,
+                        fit: BoxFit.fill,
+                        errorBuilder: (c, e, s) {
+                          print('ERROR loading terminal_cell_glow.png: $e');
+                          return Container(color: const Color(0xFFFF00FF));
+                        },
+                      ),
+                    ),
+                    ColorFiltered(
+                      colorFilter: ColorFilter.mode(primaryColor, BlendMode.srcIn),
+                      child: Image.asset(
+                        '$_terminalPath/terminal_cell_core.png',
+                        width: squareSize,
+                        height: squareSize,
+                        fit: BoxFit.fill,
+                        errorBuilder: (c, e, s) {
+                          print('ERROR loading terminal_cell_core.png: $e');
+                          return Container(color: const Color(0xFFFF00FF));
+                        },
+                      ),
+                    ),
+                    Image.asset(
+                      '$_terminalPath/terminal_cell_frame.png',
+                      width: squareSize,
+                      height: squareSize,
+                      fit: BoxFit.fill,
+                      errorBuilder: (c, e, s) {
+                        print('ERROR loading terminal_cell_frame.png: $e');
+                        return Container(color: const Color(0xFFFF00FF));
+                      },
+                    ),
+                    Image.asset(
+                      '$_basePath/$indexFile',
+                      width: squareSize,
+                      height: squareSize,
+                      fit: BoxFit.fill,
+                      errorBuilder: (c, e, s) {
+                        print('ERROR loading $indexFile: $e');
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       );
     }
@@ -90,17 +138,56 @@ class GlowCellRenderer {
             ),
           ),
           Center(
-            child: Container(
+            child: SizedBox(
               width: squareSize,
               height: squareSize,
-              decoration: BoxDecoration(
-                color: primaryColor,
-                borderRadius: BorderRadius.circular(cornerRadius),
-                boxShadow: [
-                  BoxShadow(
-                    color: secondaryColor,
-                    blurRadius: 8,
-                    spreadRadius: 2,
+              child: Stack(
+                children: [
+                  ColorFiltered(
+                    colorFilter: ColorFilter.mode(secondaryColor, BlendMode.srcIn),
+                    child: Image.asset(
+                      '$_terminalPath/terminal_cell_glow.png',
+                      width: squareSize,
+                      height: squareSize,
+                      fit: BoxFit.fill,
+                      errorBuilder: (c, e, s) {
+                        print('ERROR loading terminal_cell_glow.png (with neighbor): $e');
+                        return Container(color: const Color(0xFFFF00FF));
+                      },
+                    ),
+                  ),
+                  ColorFiltered(
+                    colorFilter: ColorFilter.mode(primaryColor, BlendMode.srcIn),
+                    child: Image.asset(
+                      '$_terminalPath/terminal_cell_core.png',
+                      width: squareSize,
+                      height: squareSize,
+                      fit: BoxFit.fill,
+                      errorBuilder: (c, e, s) {
+                        print('ERROR loading terminal_cell_core.png (with neighbor): $e');
+                        return Container(color: const Color(0xFFFF00FF));
+                      },
+                    ),
+                  ),
+                  Image.asset(
+                    '$_terminalPath/terminal_cell_frame.png',
+                    width: squareSize,
+                    height: squareSize,
+                    fit: BoxFit.fill,
+                    errorBuilder: (c, e, s) {
+                      print('ERROR loading terminal_cell_frame.png (with neighbor): $e');
+                      return Container(color: const Color(0xFFFF00FF));
+                    },
+                  ),
+                  Image.asset(
+                    '$_basePath/$indexFile',
+                    width: squareSize,
+                    height: squareSize,
+                    fit: BoxFit.fill,
+                    errorBuilder: (c, e, s) {
+                      print('ERROR loading $indexFile (with neighbor): $e');
+                      return const SizedBox.shrink();
+                    },
                   ),
                 ],
               ),
@@ -364,6 +451,14 @@ class GlowCellRenderer {
         ),
       ),
     );
+  }
+  static int _getIndexNumber(String cellValue) {
+    if (cellValue.isEmpty) return 1;
+    final code = cellValue.toLowerCase().codeUnitAt(0);
+    if (code >= 97 && code <= 116) {
+      return code - 96;
+    }
+    return 1;
   }
 }
 
